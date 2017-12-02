@@ -1,15 +1,24 @@
 package com.walmart.TicketService;
 
+import com.walmart.TicketService.timing.HoldClock;
+import com.walmart.TicketService.timing.SystemClock;
+
 import java.util.*;
 
 public class DefaultTicketService implements TicketService {
     private long maxHoldTime;
     private int nextHoldId;
-    PriorityQueue<Integer> globalSeats;
-    Holds holds;
+    private PriorityQueue<Integer> globalSeats;
+    private Holds holds;
+    private HoldClock clock;
 
 
     public DefaultTicketService(int venueSize, long maxHoldTime) {
+        this(venueSize, maxHoldTime, new SystemClock());
+    }
+
+    public DefaultTicketService(int venueSize, long maxHoldTime, HoldClock clock) {
+        this.clock = clock;
         this.maxHoldTime = maxHoldTime;
         nextHoldId = 0;
         globalSeats = new PriorityQueue<>(venueSize);
@@ -20,6 +29,16 @@ public class DefaultTicketService implements TicketService {
 
     @Override
     public int numSeatsAvailable() {
+        boolean done = false;
+        SeatHold curHead;
+        while(!done) {
+            curHead = holds.peekFirstHold();
+            if(curHead == null || !curHead.holdExpired(clock.getCurTime(), maxHoldTime))
+                done = true;
+            else {
+                globalSeats.addAll(holds.pollFirstHold().getSeats());
+            }
+        }
         return globalSeats.size();
     }
 
@@ -31,12 +50,12 @@ public class DefaultTicketService implements TicketService {
 
         PriorityQueue<Integer> seatsToBeGivenOut = new PriorityQueue<>(numSeats);
         // if we need to take from global pool of available seats
-        if(holds.size() == 0 || !holds.peekFirstHold().holdExpired(getCurTime(), maxHoldTime)) {
+        if(holds.size() == 0 || !holds.peekFirstHold().holdExpired(clock.getCurTime(), maxHoldTime)) {
             addFromGlobal(seatsToBeGivenOut, numSeats);
         } else { // start stealing from other people's holds if possible
             SeatHold nextHold = holds.peekFirstHold();
             while(numSeats > 0) {
-                if(nextHold != null && nextHold.holdExpired(getCurTime(), maxHoldTime)) {
+                if(nextHold != null && nextHold.holdExpired(clock.getCurTime(), maxHoldTime)) {
                     if (nextHold.getSeats().size() > 0) {
                         seatsToBeGivenOut.add(nextHold.getSeats().poll());
                         numSeats--;
@@ -56,7 +75,7 @@ public class DefaultTicketService implements TicketService {
             holds.pollFirstHold();
         }
 
-        SeatHold newHold = new SeatHold(nextHoldId, seatsToBeGivenOut, getCurTime(), customerEmail);
+        SeatHold newHold = new SeatHold(nextHoldId, seatsToBeGivenOut, clock.getCurTime(), customerEmail);
         holds.put(nextHoldId, newHold);
         nextHoldId++;
         return newHold;
@@ -93,10 +112,6 @@ public class DefaultTicketService implements TicketService {
             queue.add(globalSeats.poll());
             numSeats--;
         }
-    }
-
-    private long getCurTime() {
-        return System.currentTimeMillis() / 1000L;
     }
 
 }
