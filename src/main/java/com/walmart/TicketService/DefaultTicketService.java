@@ -95,9 +95,10 @@ public class DefaultTicketService implements TicketService {
             response.append(customerEmail);
             response.append(" has reserved the following seats: ");
             Integer seatNum;
-            while((seatNum = hold.getSeats().poll()) != null) {
+            PriorityQueue<Integer> curSeats = hold.getSeats();
+            while((seatNum = curSeats.poll()) != null) {
                 response.append(seatNum);
-                if(hold.getSeats().peek() != null)
+                if(curSeats.peek() != null)
                     response.append(",");
             }
             response.append(".");

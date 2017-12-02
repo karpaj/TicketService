@@ -44,13 +44,24 @@ public class DefaultTicketServiceTest {
     }
 
     @Test
-    public void testFindAndHoldSeatsWithSingleUser() {
+    public void testSecondUserUsurpsExpiredSeats() {
         SeatHold firstHold = ts.findAndHoldSeats(3, USER1);
         assert(firstHold.getSeats().size() == 3);
         assert(firstHold.getSeats().containsAll(Arrays.asList(1,2,3)));
+        assert(ts.numSeatsAvailable() == 17);
         testingClock.setCurTimeInMillis(2000);
         SeatHold secondHold = ts.findAndHoldSeats(4, USER2);
         assert(secondHold.getSeats().size() == 4);
         assert(secondHold.getSeats().containsAll(Arrays.asList(1,2,3,4)));
+        assert(ts.numSeatsAvailable() == 16);
+
+        // ensure USER1 held seats cannot be reserved
+        String user1Expected = String.format("Hold #%d for user: %s cannot be completed as the hold has expired " +
+                "and some seats are no longer available.", firstHold.getId(), USER1);
+        assert(ts.reserveSeats(firstHold.getId(), USER1).equals(user1Expected));
+
+        // ensure USER2 can reserve seats successfully
+        String user2Expected = String.format("User: %s has reserved the following seats: 1,2,3,4.", USER2);
+        assert(ts.reserveSeats(secondHold.getId(), USER2).equals(user2Expected));
     }
 }
