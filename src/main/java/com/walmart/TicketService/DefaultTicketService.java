@@ -95,7 +95,7 @@ public class DefaultTicketService implements TicketService {
      */
     @Override
     public String reserveSeats(int seatHoldId, String customerEmail) {
-        SeatHold hold = holds.remove(seatHoldId);
+        SeatHold hold = holds.get(seatHoldId);
         StringBuilder response = new StringBuilder();
         if(hold == null) {
             response.append("Hold #");
@@ -103,6 +103,7 @@ public class DefaultTicketService implements TicketService {
             response.append(" for customer: ");
             response.append(customerEmail);
             response.append(" cannot be completed as the hold has expired and some seats are no longer available.");
+            holds.remove(seatHoldId);
         } else if(!hold.getCustomerEmail().equals(customerEmail)) {
             response.append("Customer: ");
             response.append(customerEmail);
@@ -122,6 +123,7 @@ public class DefaultTicketService implements TicketService {
                     response.append(",");
             }
             response.append(".");
+            holds.remove(seatHoldId);
         }
         return response.toString();
     }
