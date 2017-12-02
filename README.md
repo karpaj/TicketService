@@ -12,6 +12,9 @@
 - Java 7+
 - Maven
 
+#### Obtain source
+Clone master to local
+
 #### Test
 $ mvn test
 
