@@ -53,26 +53,24 @@ public class DefaultTicketService implements TicketService {
         if(holds.size() == 0 || !holds.peekFirstHold().holdExpired(clock.getCurTime(), maxHoldTime)) {
             addFromGlobal(seatsToBeGivenOut, numSeats);
         } else { // start stealing from other people's holds if possible
-            SeatHold nextHold = holds.peekFirstHold();
+            SeatHold nextHold = holds.pollFirstHold();
+            PriorityQueue<Integer> nextSeats = nextHold.getSeats();
             while(numSeats > 0) {
-                if(nextHold != null && nextHold.holdExpired(clock.getCurTime(), maxHoldTime)) {
-                    if (nextHold.getSeats().size() > 0) {
-                        seatsToBeGivenOut.add(nextHold.getSeats().poll());
-                        numSeats--;
-                    } else {
-                        nextHold = holds.pollFirstHold();
-                    }
+                if(nextSeats.size() != 0) {
+                    seatsToBeGivenOut.add(nextSeats.poll());
+                    numSeats--;
+                } else if(holds.size() != 0 && holds.peekFirstHold().holdExpired(clock.getCurTime(), maxHoldTime)) {
+                    nextHold = holds.pollFirstHold();
+                    nextSeats = nextHold.getSeats();
                 } else { // we have exhausted the hold list stealing, fill the remaining from the global
                     addFromGlobal(seatsToBeGivenOut, numSeats);
+                    numSeats = 0;
                 }
             }
             // drop the remaining seats from the currently polled hold if any remain
-            if(nextHold.getSeats().size() != 0) {
-                globalSeats.addAll(nextHold.getSeats());
+            if(nextSeats.size() != 0) {
+                globalSeats.addAll(nextSeats);
             }
-
-            // drop the hold from the list because it has given up some of its seats
-            holds.pollFirstHold();
         }
 
         SeatHold newHold = new SeatHold(nextHoldId, seatsToBeGivenOut, clock.getCurTime(), customerEmail);
