@@ -20,7 +20,7 @@ public class DefaultTicketService implements TicketService {
     public DefaultTicketService(int venueSize, long maxHoldTime, HoldClock clock) {
         this.clock = clock;
         this.maxHoldTime = maxHoldTime;
-        nextHoldId = 0;
+        nextHoldId = 1;
         globalSeats = new PriorityQueue<>(venueSize);
         for(int seat = 1; seat <= venueSize; seat++)
             globalSeats.add(seat);
@@ -42,33 +42,40 @@ public class DefaultTicketService implements TicketService {
         return globalSeats.size();
     }
 
+    /**
+     * Reserve the best seats possible.
+     * @param numSeats the number of seats to find and hold
+     * @param customerEmail unique identifier for the customer
+     * @return SeatHold object representing the hold, null if an invalid number of seats or there are not enough
+     * seats to fulfil the hold in its entirety
+     */
     @Override
     public SeatHold findAndHoldSeats(int numSeats, String customerEmail) {
-        // cannot make a reservation for a number of seats less than one
-        if(numSeats <= 0)
+        // cannot make a reservation for a number of seats less than one or for more seats then are remaining
+        if(numSeats <= 0 || numSeats > numSeatsAvailable())
             return null;
 
         PriorityQueue<Integer> seatsToBeGivenOut = new PriorityQueue<>(numSeats);
         // if we need to take from global pool of available seats
-        if(holds.size() == 0 || !holds.peekFirstHold().holdExpired(clock.getCurTime(), maxHoldTime)) {
+        if(holds.isEmpty() || !holds.peekFirstHold().holdExpired(clock.getCurTime(), maxHoldTime)) {
             addFromGlobal(seatsToBeGivenOut, numSeats);
-        } else { // start stealing from other people's holds if possible
+        } else { // start taking from holds that have expired
             SeatHold nextHold = holds.pollFirstHold();
             PriorityQueue<Integer> nextSeats = nextHold.getSeats();
             while(numSeats > 0) {
-                if(nextSeats.size() != 0) {
+                if(!nextSeats.isEmpty()) {
                     seatsToBeGivenOut.add(nextSeats.poll());
                     numSeats--;
-                } else if(holds.size() != 0 && holds.peekFirstHold().holdExpired(clock.getCurTime(), maxHoldTime)) {
+                } else if(!holds.isEmpty() && holds.peekFirstHold().holdExpired(clock.getCurTime(), maxHoldTime)) {
                     nextHold = holds.pollFirstHold();
                     nextSeats = nextHold.getSeats();
-                } else { // we have exhausted the hold list stealing, fill the remaining from the global
+                } else {
                     addFromGlobal(seatsToBeGivenOut, numSeats);
                     numSeats = 0;
                 }
             }
             // drop the remaining seats from the currently polled hold if any remain
-            if(nextSeats.size() != 0) {
+            if(!nextSeats.isEmpty()) {
                 globalSeats.addAll(nextSeats);
             }
         }
@@ -79,6 +86,13 @@ public class DefaultTicketService implements TicketService {
         return newHold;
     }
 
+    /**
+     * Reserve the seats
+     * @param seatHoldId the seat hold identifier
+     * @param customerEmail the email address of the customer to which the seat hold
+     *                      is assigned
+     * @return
+     */
     @Override
     public String reserveSeats(int seatHoldId, String customerEmail) {
         SeatHold hold = holds.get(seatHoldId);
@@ -86,12 +100,18 @@ public class DefaultTicketService implements TicketService {
         if(hold == null) {
             response.append("Hold #");
             response.append(seatHoldId);
-            response.append(" for user: ");
+            response.append(" for customer: ");
             response.append(customerEmail);
             response.append(" cannot be completed as the hold has expired and some seats are no longer available.");
+        } else if(!hold.getCustomerEmail().equals(customerEmail)) {
+            response.append("Customer: ");
+            response.append(customerEmail);
+            response.append(" does not have a hold with id: ");
+            response.append(seatHoldId);
+            response.append(" on their account.");
         } else {
             holds.remove(seatHoldId);
-            response.append("User: ");
+            response.append("Customer: ");
             response.append(customerEmail);
             response.append(" has reserved the following seats: ");
             Integer seatNum;
