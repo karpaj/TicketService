@@ -95,7 +95,7 @@ public class DefaultTicketService implements TicketService {
      */
     @Override
     public String reserveSeats(int seatHoldId, String customerEmail) {
-        SeatHold hold = holds.get(seatHoldId);
+        SeatHold hold = holds.remove(seatHoldId);
         StringBuilder response = new StringBuilder();
         if(hold == null) {
             response.append("Hold #");
